@@ -104,31 +104,31 @@ df = pd.read_excel(xls, sheet_name=selected_sheet)
 
 st.subheader("📊 KPI Overview")
 
+# safe KPI calculation
 col1, col2, col3 = st.columns(3)
 
-numeric_df = df.copy()
 
-# safe numeric conversion
-for c in numeric_df.columns:
-    numeric_df[c] = pd.to_numeric(numeric_df[c], errors="ignore")
+def safe_numeric(series):
+    return pd.to_numeric(series, errors="coerce")
 
 
-# Trips (000) = column 4 after processing
+# Trips
 try:
     trips_col = df.columns[3]
-    trips_mean = pd.to_numeric(df[trips_col], errors="coerce").mean()
+    trips_mean = safe_numeric(df[trips_col]).mean()
 except:
     trips_mean = None
 
 
-# Affinity index (column E in logic)
+# Affinity
 try:
     affinity_col = df.columns[4]
-    affinity_mean = pd.to_numeric(df[affinity_col], errors="coerce").mean()
+    affinity_mean = safe_numeric(df[affinity_col]).mean()
 except:
     affinity_mean = None
 
 
+# Orange %
 def is_orange(row):
     try:
         f_val = float(row.iloc[5])
@@ -139,15 +139,14 @@ def is_orange(row):
 
 
 orange_df = df[df.apply(is_orange, axis=1)]
-
-orange_pct = len(orange_df) / len(df) * 100 if len(df) > 0 else 0
+orange_pct = len(orange_df) / len(df) * 100 if len(df) else 0
 
 
 with col1:
-    st.metric("Avg Trips (000)", f"{trips_mean:.2f}" if trips_mean else "N/A")
+    st.metric("Avg Trips (000)", f"{trips_mean:.2f}" if trips_mean is not None else "N/A")
 
 with col2:
-    st.metric("Avg Affinity", f"{affinity_mean:.2f}" if affinity_mean else "N/A")
+    st.metric("Avg Affinity", f"{affinity_mean:.2f}" if affinity_mean is not None else "N/A")
 
 with col3:
     st.metric("% Orange Rows", f"{orange_pct:.1f}%")
