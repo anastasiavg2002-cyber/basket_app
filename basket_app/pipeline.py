@@ -93,48 +93,65 @@ def apply_formatting(output_file):
         cell = ws["B1"]
         cell.value = ws.title
         cell.font = Font(bold=True, size=11)
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center")
+
+        # найти индексы колонок по имени
+        headers = {ws.cell(2, col).value: col for col in range(1, ws.max_column + 1)}
+
+        aff_col = headers.get("Affinity index to FMCG")
+        trips_col = headers.get("target_trips_raw_CS")
+
+        if not aff_col or not trips_col:
+            continue
+
+        # =========================
+        # ROW LOOP
+        # =========================
 
         for row in range(3, ws.max_row + 1):
 
             try:
-                f_val = ws.cell(row=row, column=6).value
-                h_val = ws.cell(row=row, column=8).value
+                aff = ws.cell(row=row, column=aff_col).value
+                trips = ws.cell(row=row, column=trips_col).value
 
-                if h_val != 1:
+                # convert safely
+                aff = float(aff) if aff is not None else None
+                trips = float(trips) if trips is not None else None
+
+                # -----------------
+                # ORANGE
+                # -----------------
+                if aff is not None and trips is not None:
+                    if aff >= 1.5 and trips > 30:
+
+                        for col in range(2, 6):
+                            ws.cell(row=row, column=col).fill = orange
+
+                        continue
+
+                # -----------------
+                # LIGHT GRAY
+                # -----------------
+                if trips is not None and trips < 15:
+
+                    for col in range(2, 6):
+                        ws.cell(row=row, column=col).fill = light_gray
+
+                    # delete affinity value
+                    ws.cell(row=row, column=aff_col).value = None
+
                     continue
 
-                f_val = float(f_val)
+                # -----------------
+                # GRAY
+                # -----------------
+                if aff is not None and aff >= 1.5:
 
-                e_val = ws.cell(row=row, column=5).value
-                c_val = ws.cell(row=row, column=3).value
-
-                if f_val > 30 and e_val >= 1.5:
-
-                    for col in [2,3,4,5]:
-                        ws.cell(row=row, column=col).fill = orange
-
-                    if c_val > 0.05:
-                        ws.cell(row=row, column=1).font = Font(bold=True)
-
-                elif f_val < 15:
-
-                    for col in [2,3,4,5]:
+                    for col in range(2, 6):
                         ws.cell(row=row, column=col).fill = gray
-
-                    ws.cell(row=row, column=5).value = None
-
-                else:
-
-                    for col in [2,3,4,5]:
-                        ws.cell(row=row, column=col).fill = light_gray
 
             except:
                 continue
-
-        # удалить лишние колонки
-        if ws.max_column > 5:
-            ws.delete_cols(6, ws.max_column - 5)
 
     wb.save(output_file)
 
