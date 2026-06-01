@@ -8,8 +8,12 @@ import plotly.express as px
 from pipeline import run_pipeline
 
 
+# =========================
+# CONFIG
+# =========================
+
 st.set_page_config(
-    page_title="Basket BI Dashboard",
+    page_title="Basket Analysis BI",
     layout="wide"
 )
 
@@ -17,7 +21,29 @@ st.title("📊 Basket Analysis BI Dashboard")
 
 
 # =========================
-# UPLOAD FILES
+# SIDEBAR RULES (INTERACTIVE)
+# =========================
+
+st.sidebar.header("🎛 Coloring Rules")
+
+aff_threshold = st.sidebar.slider(
+    "Affinity threshold",
+    0.0, 5.0, 1.5, 0.1
+)
+
+high_trips = st.sidebar.slider(
+    "High Trips threshold",
+    0, 100, 30, 1
+)
+
+low_trips = st.sidebar.slider(
+    "Low Trips threshold",
+    0, 100, 15, 1
+)
+
+
+# =========================
+# FILE UPLOADS
 # =========================
 
 projects_zip = st.file_uploader("Upload projects.zip", type=["zip"])
@@ -33,7 +59,7 @@ total_file = st.file_uploader("Upload total.xlsx", type=["xlsx"])
 if st.button("RUN PIPELINE"):
 
     if not projects_zip or not reference_file or not config_file or not total_file:
-        st.error("Upload all files")
+        st.error("Upload all required files")
 
     else:
 
@@ -50,6 +76,7 @@ if st.button("RUN PIPELINE"):
             f.write(total_file.getbuffer())
 
         with st.spinner("Processing pipeline..."):
+
             output_zip = run_pipeline(
                 "projects.zip",
                 "Список.xlsx",
@@ -60,7 +87,11 @@ if st.button("RUN PIPELINE"):
         st.success("Done!")
 
         with open(output_zip, "rb") as f:
-            st.download_button("Download Results", f, file_name="results.zip")
+            st.download_button(
+                "Download results",
+                f,
+                file_name="results.zip"
+            )
 
 
 # =========================
@@ -68,7 +99,7 @@ if st.button("RUN PIPELINE"):
 # =========================
 
 st.divider()
-st.header("📌 BI Dashboard (Results)")
+st.header("📌 Interactive Analysis")
 
 
 RESULTS_DIR = "results"
@@ -85,10 +116,11 @@ if not files:
 
 
 # =========================
-# SELECT PROJECT / SHEET
+# SELECT FILE / SHEET
 # =========================
 
-selected_file = st.selectbox("Select project", files)
+selected_file = st.selectbox("Select project file", files)
+
 file_path = os.path.join(RESULTS_DIR, selected_file)
 
 xls = pd.ExcelFile(file_path)
@@ -99,48 +131,79 @@ df = pd.read_excel(xls, sheet_name=selected_sheet)
 
 
 # =========================
-# KPI DASHBOARD
+# CLEAN COLUMN NAMES SAFE
+# =========================
+
+df.columns = [str(c) for c in df.columns]
+
+
+# =========================
+# KPI SECTION (SAFE)
 # =========================
 
 st.subheader("📊 KPI Overview")
 
-# safe KPI calculation
 col1, col2, col3 = st.columns(3)
 
 
-def safe_numeric(series):
+def safe_num(series):
     return pd.to_numeric(series, errors="coerce")
 
 
 # Trips
+trips_mean = None
+affinity_mean = None
+
 try:
-    trips_col = df.columns[3]
-    trips_mean = safe_numeric(df[trips_col]).mean()
+    trips_col = "Trips (000)" if "Trips (000)" in df.columns else df.columns[3]
+    trips_mean = safe_num(df[trips_col]).mean()
 except:
-    trips_mean = None
+    pass
 
-
-# Affinity
 try:
-    affinity_col = df.columns[4]
-    affinity_mean = safe_numeric(df[affinity_col]).mean()
+    affinity_col = "Affinity index to FMCG"
+    affinity_mean = safe_num(df[affinity_col]).mean()
 except:
-    affinity_mean = None
+    pass
 
 
-# Orange %
-def is_orange(row):
+# =========================
+# CLASSIFICATION LOGIC
+# =========================
+
+def classify_row(row):
+
     try:
-        f_val = float(row.iloc[5])
-        e_val = row.iloc[4]
-        return (f_val > 30 and e_val >= 1.5)
+        aff = float(row.get("Affinity index to FMCG", None))
     except:
-        return False
+        aff = None
+
+    try:
+        trips = float(row.get("target_trips_raw_CS", None))
+    except:
+        trips = None
+
+    if aff is not None and trips is not None:
+        if aff >= aff_threshold and trips > high_trips:
+            return "orange"
+
+    if trips is not None and trips < low_trips:
+        return "light_gray"
+
+    if aff is not None and aff >= aff_threshold:
+        return "gray"
+
+    return "none"
 
 
-orange_df = df[df.apply(is_orange, axis=1)]
-orange_pct = len(orange_df) / len(df) * 100 if len(df) else 0
+df["color"] = df.apply(classify_row, axis=1)
 
+orange_df = df[df["color"] == "orange"]
+
+
+# =========================
+# KPI DISPLAY
+# =========================
 
 with col1:
     st.metric("Avg Trips (000)", f"{trips_mean:.2f}" if trips_mean is not None else "N/A")
@@ -149,11 +212,12 @@ with col2:
     st.metric("Avg Affinity", f"{affinity_mean:.2f}" if affinity_mean is not None else "N/A")
 
 with col3:
+    orange_pct = len(orange_df) / len(df) * 100 if len(df) else 0
     st.metric("% Orange Rows", f"{orange_pct:.1f}%")
 
 
 # =========================
-# PREVIEW TABLE
+# PREVIEW
 # =========================
 
 st.subheader("📄 Data Preview")
@@ -164,15 +228,10 @@ st.dataframe(df, use_container_width=True)
 # SCATTER PLOT (PLOTLY)
 # =========================
 
-st.subheader("📈 Interactive Scatter Plot (Orange Rows)")
+st.subheader("📈 Interactive Scatter (Colored by Rules)")
 
 
-if len(orange_df) == 0:
-    st.warning("No orange rows found")
-    st.stop()
-
-
-numeric_cols = orange_df.select_dtypes(include=["number"]).columns.tolist()
+numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
 if len(numeric_cols) < 2:
     st.warning("Not enough numeric columns")
@@ -188,34 +247,43 @@ with col2:
     y_axis = st.selectbox("Y axis", numeric_cols)
 
 
+color_map = {
+    "orange": "orange",
+    "light_gray": "lightgray",
+    "gray": "gray",
+    "none": "blue"
+}
+
+
 fig = px.scatter(
-    orange_df,
+    df,
     x=x_axis,
     y=y_axis,
-    text=orange_df.iloc[:, 0],  # column A labels
-    title="Orange rows scatter"
+    color="color",
+    color_discrete_map=color_map,
+    text=df.iloc[:, 0],  # column A labels
+    title="Basket Scatter Plot (Interactive Rules)"
 )
 
 fig.update_traces(textposition="top center")
 
-
-selected_points = st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
 
 
 # =========================
-# CLICK FILTER (SIMULATION)
+# DRILL DOWN
 # =========================
 
-st.subheader("🔍 Drill-down")
+st.subheader("🔍 Drill-down (Orange rows)")
 
-st.write("Select row manually:")
+if len(orange_df) > 0:
 
-selected_index = st.selectbox(
-    "Choose row index",
-    orange_df.index
-)
+    selected_idx = st.selectbox("Select row", orange_df.index)
 
-st.dataframe(orange_df.loc[[selected_index]], use_container_width=True)
+    st.dataframe(orange_df.loc[[selected_idx]], use_container_width=True)
+
+else:
+    st.info("No orange rows")
 
 
 # =========================
@@ -238,7 +306,7 @@ st.download_button(
 
 st.subheader("📊 Multi-project comparison")
 
-compare_files = st.multiselect("Select projects to compare", files)
+compare_files = st.multiselect("Select projects", files)
 
 if len(compare_files) >= 2:
 
@@ -246,11 +314,11 @@ if len(compare_files) >= 2:
 
     for f in compare_files:
 
-        xls = pd.ExcelFile(os.path.join(RESULTS_DIR, f))
+        xls_tmp = pd.ExcelFile(os.path.join(RESULTS_DIR, f))
 
-        for sheet in xls.sheet_names:
+        for sheet in xls_tmp.sheet_names:
 
-            tmp = pd.read_excel(xls, sheet_name=sheet)
+            tmp = pd.read_excel(xls_tmp, sheet_name=sheet)
             tmp["project"] = f
             combined.append(tmp)
 
@@ -260,13 +328,18 @@ if len(compare_files) >= 2:
 
     if len(num_cols) >= 2:
 
-        x_axis = st.selectbox("Compare X", num_cols, key="cmpx")
-        y_axis = st.selectbox("Compare Y", num_cols, key="cmpy")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            x_axis_cmp = st.selectbox("Compare X", num_cols, key="cmpx")
+
+        with col2:
+            y_axis_cmp = st.selectbox("Compare Y", num_cols, key="cmpy")
 
         fig2 = px.scatter(
             full_df,
-            x=x_axis,
-            y=y_axis,
+            x=x_axis_cmp,
+            y=y_axis_cmp,
             color="project",
             hover_data=["project"]
         )
