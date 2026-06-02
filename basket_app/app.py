@@ -19,7 +19,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Basket Analysis")
+st.title("Basket Analysis")
 
 
 # =========================
@@ -101,7 +101,7 @@ if st.button("RUN PIPELINE"):
 # =========================
 
 st.divider()
-st.header("📌 Interactive Analysis")
+st.header("Interactive Analysis")
 
 
 RESULTS_DIR = "results"
@@ -147,7 +147,7 @@ df.columns = [str(c) for c in df.columns]
 # KPI SECTION (SAFE)
 # =========================
 
-st.subheader("📊 KPI Overview")
+st.subheader("KPI Overview")
 
 col1, col2, col3 = st.columns(3)
 
@@ -253,7 +253,7 @@ selected_categories = st.multiselect(
 # SCATTER PLOT (PLOTLY)
 # =========================
 
-st.subheader("📈 Scatter Plot")
+st.subheader("Scatter Plot")
 
 
 numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
