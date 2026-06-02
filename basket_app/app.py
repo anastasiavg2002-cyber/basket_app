@@ -214,9 +214,6 @@ orange_df = df[df["color"] == "orange"]
 with col1:
     st.metric("Avg Trips (000)", f"{trips_mean:.2f}" if trips_mean is not None else "N/A")
 
-with col2:
-    st.metric("Avg Affinity", f"{affinity_mean:.2f}" if affinity_mean is not None else "N/A")
-
 with col3:
     orange_pct = len(orange_df) / len(df) * 100 if len(df) else 0
     st.metric("% Orange Rows", f"{orange_pct:.1f}%")
@@ -256,7 +253,7 @@ selected_categories = st.multiselect(
 # SCATTER PLOT (PLOTLY)
 # =========================
 
-st.subheader("📈 Interactive Scatter (Colored by Rules)")
+st.subheader("📈 Scatter Plot")
 
 
 numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
@@ -301,17 +298,3 @@ fig.update_traces(textposition="top center")
 
 st.plotly_chart(fig, use_container_width=True)
 
-
-
-# =========================
-# DOWNLOAD FILTERED DATA
-# =========================
-
-csv = orange_df.to_csv(index=False).encode("utf-8")
-
-st.download_button(
-    "Download orange rows",
-    csv,
-    file_name="orange_rows.csv",
-    mime="text/csv"
-)
