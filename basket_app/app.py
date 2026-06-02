@@ -50,7 +50,7 @@ low_trips = st.sidebar.slider(
 
 projects_zip = st.file_uploader("Upload projects.zip", type=["zip"])
 reference_file = st.file_uploader("Upload Список.xlsx", type=["xlsx"])
-config_file = st.file_uploader("Upload sheet_config.xlsx", type=["xlsx"])
+#config_file = st.file_uploader("Upload sheet_config.xlsx", type=["xlsx"])
 total_file = st.file_uploader("Upload total.xlsx", type=["xlsx"])
 
 
@@ -60,6 +60,57 @@ total_file = st.file_uploader("Upload total.xlsx", type=["xlsx"])
 
 if st.button("RUN PIPELINE"):
 
+    # =========================
+    # новый блок
+    # =========================
+    import zipfile
+    import tempfile
+    from pathlib import Path
+
+    def generate_sheet_config(zip_path):
+
+    with tempfile.TemporaryDirectory() as tmp:
+
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(tmp)
+
+        names = set()
+
+        for root, dirs, files in os.walk(tmp):
+
+            for file in files:
+
+                if file.endswith(".xlsx"):
+
+                    name = Path(file).stem.split("_")[-1]
+
+                    names.add(name)
+
+        names = sorted(names)
+
+        return pd.DataFrame({
+            "original": names,
+            "rename": names,
+            "order": range(1, len(names)+1)
+        })
+
+    
+
+    
+    # =========================
+    # конец нового блока
+    # =========================
+
+
+
+
+
+
+
+
+
+    
+
     if not projects_zip or not reference_file or not config_file or not total_file:
         st.error("Upload all required files")
 
@@ -68,23 +119,62 @@ if st.button("RUN PIPELINE"):
         with open("projects.zip", "wb") as f:
             f.write(projects_zip.getbuffer())
 
+            sheet_config_df = generate_sheet_config("projects.zip")
+
+            st.subheader("Sheet Configuration")
+
+            sheet_config_df = st.data_editor(
+                sheet_config_df,
+                use_container_width=True
+            )
+
         with open("Список.xlsx", "wb") as f:
             f.write(reference_file.getbuffer())
 
-        with open("sheet_config.xlsx", "wb") as f:
-            f.write(config_file.getbuffer())
+       #with open("sheet_config.xlsx", "wb") as f:
+            #f.write(config_file.getbuffer())
 
         with open("total.xlsx", "wb") as f:
             f.write(total_file.getbuffer())
+            total_df = pd.read_excel("total.xlsx")
+
+            mapping_df = pd.DataFrame({
+                "original":
+                    sorted(
+                        total_df.iloc[:,1]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                    )
+            })
+
+            mapping_df["rename"] = mapping_df["original"]
+            st.subheader("Total Mapping")
+
+            mapping_df = st.data_editor(
+                mapping_df,
+                use_container_width=True
+            )
+
+        sheet_config_df.to_excel(
+        "sheet_config.xlsx",
+        index=False
+    )
+    
+        mapping_df.to_excel(
+        "total_mapping.xlsx",
+        index=False
+    )
 
         with st.spinner("Processing pipeline..."):
 
-            output_zip = run_pipeline(
-                "projects.zip",
-                "Список.xlsx",
-                "sheet_config.xlsx",
-                "total.xlsx"
-            )
+        output_zip = run_pipeline(
+            "projects.zip",
+            "Список.xlsx",
+            "sheet_config.xlsx",
+            "total.xlsx",
+            "total_mapping.xlsx"
+        )
 
         st.success("Done!")
 
