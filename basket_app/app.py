@@ -17,14 +17,14 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Basket Analysis BI Dashboard")
+st.title("📊 Basket Analysis")
 
 
 # =========================
 # SIDEBAR RULES (INTERACTIVE)
 # =========================
 
-st.sidebar.header("🎛 Coloring Rules")
+st.sidebar.header("Coloring Rules")
 
 aff_threshold = st.sidebar.slider(
     "Affinity threshold",
