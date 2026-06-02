@@ -127,7 +127,11 @@ xls = pd.ExcelFile(file_path)
 
 selected_sheet = st.selectbox("Select sheet", xls.sheet_names)
 
-df = pd.read_excel(xls, sheet_name=selected_sheet)
+df = pd.read_excel(
+    xls,
+    sheet_name=selected_sheet,
+    header=1
+)
 
 
 # =========================
@@ -318,7 +322,11 @@ if len(compare_files) >= 2:
 
         for sheet in xls_tmp.sheet_names:
 
-            tmp = pd.read_excel(xls_tmp, sheet_name=sheet)
+            tmp = pd.read_excel(
+                    xls_tmp,
+                    sheet_name=sheet,
+                    header=1
+                )
             tmp["project"] = f
             combined.append(tmp)
 
