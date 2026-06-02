@@ -8,6 +8,8 @@ import plotly.express as px
 from pipeline import run_pipeline
 
 
+
+
 # =========================
 # CONFIG
 # =========================
@@ -227,6 +229,28 @@ with col3:
 st.subheader("📄 Data Preview")
 st.dataframe(df, use_container_width=True)
 
+# =========================
+# FILTER ORANGE
+# =========================
+
+
+st.subheader("🟠 Orange Categories")
+orange_df = df[df["color"] == "orange"]
+category_col = df.columns[0]
+
+orange_categories = sorted(
+    orange_df[category_col]
+    .dropna()
+    .astype(str)
+    .unique()
+)
+
+selected_categories = st.multiselect(
+    "Select categories for scatter plot",
+    orange_categories,
+    default=orange_categories
+)
+
 
 # =========================
 # SCATTER PLOT (PLOTLY)
@@ -258,36 +282,25 @@ color_map = {
     "none": "blue"
 }
 
+plot_df = orange_df[
+    orange_df[category_col]
+    .astype(str)
+    .isin(selected_categories)
+]
 
 fig = px.scatter(
-    df,
+    plot_df,
     x=x_axis,
     y=y_axis,
     color="color",
-    color_discrete_map=color_map,
-    text=df.iloc[:, 0],  # column A labels
-    title="Basket Scatter Plot (Interactive Rules)"
+    text=category_col,
+    color_discrete_map=color_map
 )
 
 fig.update_traces(textposition="top center")
 
 st.plotly_chart(fig, use_container_width=True)
 
-
-# =========================
-# DRILL DOWN
-# =========================
-
-st.subheader("🔍 Drill-down (Orange rows)")
-
-if len(orange_df) > 0:
-
-    selected_idx = st.selectbox("Select row", orange_df.index)
-
-    st.dataframe(orange_df.loc[[selected_idx]], use_container_width=True)
-
-else:
-    st.info("No orange rows")
 
 
 # =========================
@@ -302,54 +315,3 @@ st.download_button(
     file_name="orange_rows.csv",
     mime="text/csv"
 )
-
-
-# =========================
-# MULTI-PROJECT COMPARISON
-# =========================
-
-st.subheader("📊 Multi-project comparison")
-
-compare_files = st.multiselect("Select projects", files)
-
-if len(compare_files) >= 2:
-
-    combined = []
-
-    for f in compare_files:
-
-        xls_tmp = pd.ExcelFile(os.path.join(RESULTS_DIR, f))
-
-        for sheet in xls_tmp.sheet_names:
-
-            tmp = pd.read_excel(
-                    xls_tmp,
-                    sheet_name=sheet,
-                    header=1
-                )
-            tmp["project"] = f
-            combined.append(tmp)
-
-    full_df = pd.concat(combined, ignore_index=True)
-
-    num_cols = full_df.select_dtypes(include=["number"]).columns.tolist()
-
-    if len(num_cols) >= 2:
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            x_axis_cmp = st.selectbox("Compare X", num_cols, key="cmpx")
-
-        with col2:
-            y_axis_cmp = st.selectbox("Compare Y", num_cols, key="cmpy")
-
-        fig2 = px.scatter(
-            full_df,
-            x=x_axis_cmp,
-            y=y_axis_cmp,
-            color="project",
-            hover_data=["project"]
-        )
-
-        st.plotly_chart(fig2, use_container_width=True)
