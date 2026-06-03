@@ -278,6 +278,29 @@ if os.path.exists(RESULTS_DIR):
             with col2:
                 y = st.selectbox("Y axis", numeric_cols)
 
+            st.sidebar.header("Axis range")
+
+            x_min, x_max = st.sidebar.slider(
+                f"{x} range",
+                float(df[x].min()),
+                float(df[x].max()),
+                (float(df[x].min()), float(df[x].max()))
+            )
+            
+            y_min, y_max = st.sidebar.slider(
+                f"{y} range",
+                float(df[y].min()),
+                float(df[y].max()),
+                (float(df[y].min()), float(df[y].max()))
+            )
+
+            plot_df = plot_df[
+            (plot_df[x] >= x_min) &
+            (plot_df[x] <= x_max) &
+            (plot_df[y] >= y_min) &
+            (plot_df[y] <= y_max)
+        ]
+
             fig = px.scatter(
                 plot_df,
                 x=x,
@@ -287,5 +310,7 @@ if os.path.exists(RESULTS_DIR):
             )
 
             fig.update_traces(textposition="top center")
+            fig.update_layout(showlegend=False)
+            
 
             st.plotly_chart(fig, use_container_width=True)
