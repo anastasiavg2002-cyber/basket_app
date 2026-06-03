@@ -168,15 +168,15 @@ if st.button("RUN PIPELINE"):
 
         with st.spinner("Processing pipeline..."):
 
-        output_zip = run_pipeline(
-            "projects.zip",
-            "Список.xlsx",
-            "sheet_config.xlsx",
-            "total.xlsx",
-            "total_mapping.xlsx"
-        )
-
-        st.success("Done!")
+            output_zip = run_pipeline(
+                "projects.zip",
+                "Список.xlsx",
+                "sheet_config.xlsx",
+                "total.xlsx",
+                "total_mapping.xlsx"
+            )
+    
+            st.success("Done!")
 
         with open(output_zip, "rb") as f:
             st.download_button(
