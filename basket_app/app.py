@@ -20,7 +20,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📊 Basket Analysis BI")
+st.title("📊 Basket Analysis")
 
 
 # =========================
