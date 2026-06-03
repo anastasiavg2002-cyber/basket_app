@@ -282,7 +282,7 @@ if os.path.exists(RESULTS_DIR):
                 plot_df,
                 x=x,
                 y=y,
-                color="orange",
+                color="color",
                 text=category_col
             )
 
