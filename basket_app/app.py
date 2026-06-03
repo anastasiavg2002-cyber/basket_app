@@ -113,7 +113,7 @@ def generate_mapping(total_file):
 
 if projects_zip:
 
-    st.subheader("⚙ Sheet Configuration")
+    st.subheader("Sheets configuration")
 
     st.session_state.sheet_config = generate_sheet_config(projects_zip)
 
@@ -125,7 +125,7 @@ if projects_zip:
 
 if total_file:
 
-    st.subheader("🔁 Total Mapping")
+    st.subheader("Total File")
 
     st.session_state.mapping = generate_mapping(total_file)
 
