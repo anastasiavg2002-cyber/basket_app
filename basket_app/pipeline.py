@@ -160,7 +160,13 @@ def apply_formatting(output_file):
 # MAIN PIPELINE
 # =========================
 
-def run_pipeline(projects_zip_path, reference_path, config_path, total_path):
+def run_pipeline(
+    projects_zip_path,
+    reference_path,
+    config_path,
+    total_path,
+    total_mapping_path
+):
 
     shutil.rmtree("projects", ignore_errors=True)
     shutil.rmtree("results", ignore_errors=True)
@@ -183,6 +189,21 @@ def run_pipeline(projects_zip_path, reference_path, config_path, total_path):
 
     # total
     total_df = pd.read_excel(total_path)
+
+    mapping_df = pd.read_excel(total_mapping_path)
+
+    mapping = dict(
+        zip(
+            mapping_df["original"],
+            mapping_df["rename"]
+        )
+    )
+
+    total_df.iloc[:,1] = (
+        total_df.iloc[:,1]
+        .astype(str)
+        .map(lambda x: mapping.get(x, x))
+    )
 
     base_path = Path("projects")
     result_path = Path("results")
