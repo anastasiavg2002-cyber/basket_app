@@ -288,13 +288,13 @@ if os.path.exists(RESULTS_DIR):
             key="x_range"
         )
         
-        y_min, y_max = st.sidebar.slider(
-            f"{y} range (Y)",
-            float(df[y].min()),
-            float(df[y].max()),
-            (float(df[y].min()), float(df[y].max())),
-            key="y_range"
-        )
+            y_min, y_max = st.sidebar.slider(
+                f"{y} range (Y)",
+                float(df[y].min()),
+                float(df[y].max()),
+                (float(df[y].min()), float(df[y].max())),
+                key="y_range"
+            )
 
             plot_df = plot_df[
             (plot_df[x] >= x_min) &
