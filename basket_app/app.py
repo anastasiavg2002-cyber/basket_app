@@ -139,7 +139,7 @@ if total_file:
 # RUN PIPELINE
 # =========================
 
-if st.button("RUN PIPELINE"):
+if st.button("RUN"):
 
     if not projects_zip or not reference_file or not total_file:
         st.error("Upload all required files")
