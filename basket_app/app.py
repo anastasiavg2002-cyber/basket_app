@@ -281,18 +281,20 @@ if os.path.exists(RESULTS_DIR):
             st.sidebar.header("Axis range")
 
             x_min, x_max = st.sidebar.slider(
-                f"{x} range",
-                float(df[x].min()),
-                float(df[x].max()),
-                (float(df[x].min()), float(df[x].max()))
-            )
-            
-            y_min, y_max = st.sidebar.slider(
-                f"{y} range",
-                float(df[y].min()),
-                float(df[y].max()),
-                (float(df[y].min()), float(df[y].max()))
-            )
+            f"{x} range (X)",
+            float(df[x].min()),
+            float(df[x].max()),
+            (float(df[x].min()), float(df[x].max())),
+            key="x_range"
+        )
+        
+        y_min, y_max = st.sidebar.slider(
+            f"{y} range (Y)",
+            float(df[y].min()),
+            float(df[y].max()),
+            (float(df[y].min()), float(df[y].max())),
+            key="y_range"
+        )
 
             plot_df = plot_df[
             (plot_df[x] >= x_min) &
