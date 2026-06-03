@@ -3,11 +3,12 @@
 import streamlit as st
 import pandas as pd
 import os
+import zipfile
+import tempfile
 import plotly.express as px
+from pathlib import Path
 
 from pipeline import run_pipeline
-
-
 
 
 # =========================
@@ -19,29 +20,29 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Basket Analysis")
+st.title("📊 Basket Analysis BI")
 
 
 # =========================
-# SIDEBAR RULES (INTERACTIVE)
+# SIDEBAR
 # =========================
 
 st.sidebar.header("Coloring Rules")
 
-aff_threshold = st.sidebar.slider(
-    "Affinity threshold",
-    0.0, 5.0, 1.5, 0.1
-)
+aff_threshold = st.sidebar.slider("Affinity threshold", 0.0, 5.0, 1.5, 0.1)
+high_trips = st.sidebar.slider("High Trips threshold", 0, 100, 30, 1)
+low_trips = st.sidebar.slider("Low Trips threshold", 0, 100, 15, 1)
 
-high_trips = st.sidebar.slider(
-    "High Trips threshold",
-    0, 100, 30, 1
-)
 
-low_trips = st.sidebar.slider(
-    "Low Trips threshold",
-    0, 100, 15, 1
-)
+# =========================
+# SESSION STATE INIT
+# =========================
+
+if "sheet_config" not in st.session_state:
+    st.session_state.sheet_config = None
+
+if "mapping" not in st.session_state:
+    st.session_state.mapping = None
 
 
 # =========================
@@ -50,31 +51,21 @@ low_trips = st.sidebar.slider(
 
 projects_zip = st.file_uploader("Upload projects.zip", type=["zip"])
 reference_file = st.file_uploader("Upload Список.xlsx", type=["xlsx"])
-#config_file = st.file_uploader("Upload sheet_config.xlsx", type=["xlsx"])
 total_file = st.file_uploader("Upload total.xlsx", type=["xlsx"])
 
 
 # =========================
-# RUN PIPELINE
+# GENERATE SHEET CONFIG
 # =========================
 
-if st.button("RUN PIPELINE"):
+def generate_sheet_config(zip_path):
 
-    # =========================
-    # новый блок
-    # =========================
-    import zipfile
-    import tempfile
-    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
 
-    def generate_sheet_config(zip_path):
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(tmp)
 
-        with tempfile.TemporaryDirectory() as tmp:
-    
-            with zipfile.ZipFile(zip_path, "r") as z:
-                z.extractall(tmp)
-    
-            names = set()
+        names = set()
 
         for root, dirs, files in os.walk(tmp):
 
@@ -83,308 +74,218 @@ if st.button("RUN PIPELINE"):
                 if file.endswith(".xlsx"):
 
                     name = Path(file).stem.split("_")[-1]
-
                     names.add(name)
 
-        names = sorted(names)
+    names = sorted(names)
 
-        return pd.DataFrame({
-            "original": names,
-            "rename": names,
-            "order": range(1, len(names)+1)
-        })
-
-    
-
-    
-    # =========================
-    # конец нового блока
-    # =========================
+    return pd.DataFrame({
+        "original": names,
+        "rename": names,
+        "order": range(1, len(names) + 1)
+    })
 
 
+# =========================
+# GENERATE MAPPING
+# =========================
+
+def generate_mapping(total_file):
+
+    total_df = pd.read_excel(total_file)
+
+    mapping_df = pd.DataFrame({
+        "original": sorted(
+            total_df.iloc[:, 1]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+    })
+
+    mapping_df["rename"] = mapping_df["original"]
+
+    return mapping_df
 
 
+# =========================
+# BUILD CONFIG UI (OUTSIDE BUTTON)
+# =========================
+
+if projects_zip:
+
+    st.subheader("⚙ Sheet Configuration")
+
+    st.session_state.sheet_config = generate_sheet_config(projects_zip)
+
+    st.session_state.sheet_config = st.data_editor(
+        st.session_state.sheet_config,
+        use_container_width=True
+    )
 
 
+if total_file:
+
+    st.subheader("🔁 Total Mapping")
+
+    st.session_state.mapping = generate_mapping(total_file)
+
+    st.session_state.mapping = st.data_editor(
+        st.session_state.mapping,
+        use_container_width=True
+    )
 
 
+# =========================
+# RUN PIPELINE
+# =========================
 
-    
+if st.button("RUN PIPELINE"):
 
     if not projects_zip or not reference_file or not total_file:
         st.error("Upload all required files")
+        st.stop()
 
-    else:
+    # save files
+    with open("projects.zip", "wb") as f:
+        f.write(projects_zip.getbuffer())
 
-        with open("projects.zip", "wb") as f:
-            f.write(projects_zip.getbuffer())
+    with open("Список.xlsx", "wb") as f:
+        f.write(reference_file.getbuffer())
 
-            sheet_config_df = generate_sheet_config("projects.zip")
+    with open("total.xlsx", "wb") as f:
+        f.write(total_file.getbuffer())
 
-            st.subheader("Sheet Configuration")
+    # save configs from UI
+    if st.session_state.sheet_config is None:
+        st.error("Sheet config missing")
+        st.stop()
 
-            sheet_config_df = st.data_editor(
-                sheet_config_df,
-                use_container_width=True
-            )
+    if st.session_state.mapping is None:
+        st.error("Mapping missing")
+        st.stop()
 
-        with open("Список.xlsx", "wb") as f:
-            f.write(reference_file.getbuffer())
+    st.session_state.sheet_config.to_excel("sheet_config.xlsx", index=False)
+    st.session_state.mapping.to_excel("total_mapping.xlsx", index=False)
 
-       #with open("sheet_config.xlsx", "wb") as f:
-            #f.write(config_file.getbuffer())
+    with st.spinner("Processing..."):
 
-        with open("total.xlsx", "wb") as f:
-            f.write(total_file.getbuffer())
-            total_df = pd.read_excel("total.xlsx")
+        output_zip = run_pipeline(
+            "projects.zip",
+            "Список.xlsx",
+            "sheet_config.xlsx",
+            "total.xlsx",
+            "total_mapping.xlsx"
+        )
 
-            mapping_df = pd.DataFrame({
-                "original":
-                    sorted(
-                        total_df.iloc[:,1]
-                        .dropna()
-                        .astype(str)
-                        .unique()
-                    )
-            })
+    st.success("Done!")
 
-            mapping_df["rename"] = mapping_df["original"]
-            st.subheader("Total Mapping")
-
-            mapping_df = st.data_editor(
-                mapping_df,
-                use_container_width=True
-            )
-
-        sheet_config_df.to_excel(
-        "sheet_config.xlsx",
-        index=False
-    )
-    
-        mapping_df.to_excel(
-        "total_mapping.xlsx",
-        index=False
-    )
-
-        with st.spinner("Processing pipeline..."):
-
-            output_zip = run_pipeline(
-                "projects.zip",
-                "Список.xlsx",
-                "sheet_config.xlsx",
-                "total.xlsx",
-                "total_mapping.xlsx"
-            )
-    
-            st.success("Done!")
-
-        with open(output_zip, "rb") as f:
-            st.download_button(
-                "Download results",
-                f,
-                file_name="results.zip"
-            )
+    with open(output_zip, "rb") as f:
+        st.download_button(
+            "Download results",
+            f,
+            file_name="results.zip"
+        )
 
 
 # =========================
-# LOAD RESULTS
+# RESULTS VIEW
 # =========================
 
 st.divider()
-st.header("Interactive Analysis")
-
+st.header("📊 Analysis")
 
 RESULTS_DIR = "results"
 
-if not os.path.exists(RESULTS_DIR):
-    st.info("Run pipeline first")
-    st.stop()
+if os.path.exists(RESULTS_DIR):
 
-files = [f for f in os.listdir(RESULTS_DIR) if f.endswith(".xlsx")]
+    files = [f for f in os.listdir(RESULTS_DIR) if f.endswith(".xlsx")]
 
-if not files:
-    st.info("No results found")
-    st.stop()
+    if files:
 
+        selected_file = st.selectbox("Select file", files)
 
-# =========================
-# SELECT FILE / SHEET
-# =========================
+        xls = pd.ExcelFile(os.path.join(RESULTS_DIR, selected_file))
 
-selected_file = st.selectbox("Select project file", files)
+        sheet = st.selectbox("Select sheet", xls.sheet_names)
 
-file_path = os.path.join(RESULTS_DIR, selected_file)
+        df = pd.read_excel(xls, sheet_name=sheet, header=1)
 
-xls = pd.ExcelFile(file_path)
+        df.columns = [str(c) for c in df.columns]
 
-selected_sheet = st.selectbox("Select sheet", xls.sheet_names)
+        st.subheader("Preview")
+        st.dataframe(df, use_container_width=True)
 
-df = pd.read_excel(
-    xls,
-    sheet_name=selected_sheet,
-    header=1
-)
+        # =========================
+        # COLOR LOGIC
+        # =========================
 
+        def classify(row):
 
-# =========================
-# CLEAN COLUMN NAMES SAFE
-# =========================
+            try:
+                aff = float(row.get("Affinity index to FMCG", 0))
+                trips = float(row.get("target_trips_raw_CS", 0))
+            except:
+                return "none"
 
-df.columns = [str(c) for c in df.columns]
+            if aff >= aff_threshold and trips > high_trips:
+                return "orange"
 
+            if trips < low_trips:
+                return "light_gray"
 
-# =========================
-# KPI SECTION (SAFE)
-# =========================
+            if aff >= aff_threshold:
+                return "gray"
 
-st.subheader("KPI Overview")
+            return "none"
 
-col1, col2, col3 = st.columns(3)
+        df["color"] = df.apply(classify, axis=1)
 
+        orange_df = df[df["color"] == "orange"]
 
-def safe_num(series):
-    return pd.to_numeric(series, errors="coerce")
+        # =========================
+        # FILTER
+        # =========================
 
+        category_col = df.columns[0]
 
-# Trips
-trips_mean = None
-affinity_mean = None
+        st.subheader("🟠 Orange filter")
 
-try:
-    trips_col = "Trips (000)" if "Trips (000)" in df.columns else df.columns[3]
-    trips_mean = safe_num(df[trips_col]).mean()
-except:
-    pass
+        categories = sorted(orange_df[category_col].dropna().astype(str).unique())
 
-try:
-    affinity_col = "Affinity index to FMCG"
-    affinity_mean = safe_num(df[affinity_col]).mean()
-except:
-    pass
+        selected = st.multiselect(
+            "Select categories",
+            categories,
+            default=categories
+        )
 
+        plot_df = orange_df[
+            orange_df[category_col].astype(str).isin(selected)
+        ]
 
-# =========================
-# CLASSIFICATION LOGIC
-# =========================
+        # =========================
+        # SCATTER
+        # =========================
 
-def classify_row(row):
+        numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
 
-    try:
-        aff = float(row.get("Affinity index to FMCG", None))
-    except:
-        aff = None
+        if len(numeric_cols) >= 2:
 
-    try:
-        trips = float(row.get("target_trips_raw_CS", None))
-    except:
-        trips = None
+            col1, col2 = st.columns(2)
 
-    if aff is not None and trips is not None:
-        if aff >= aff_threshold and trips > high_trips:
-            return "orange"
+            with col1:
+                x = st.selectbox("X axis", numeric_cols)
 
-    if trips is not None and trips < low_trips:
-        return "light_gray"
+            with col2:
+                y = st.selectbox("Y axis", numeric_cols)
 
-    if aff is not None and aff >= aff_threshold:
-        return "gray"
+            fig = px.scatter(
+                plot_df,
+                x=x,
+                y=y,
+                color="color",
+                text=category_col
+            )
 
-    return "none"
+            fig.update_traces(textposition="top center")
 
-
-df["color"] = df.apply(classify_row, axis=1)
-
-orange_df = df[df["color"] == "orange"]
-
-
-# =========================
-# KPI DISPLAY
-# =========================
-
-with col1:
-    st.metric("Avg Trips (000)", f"{trips_mean:.2f}" if trips_mean is not None else "N/A")
-
-with col3:
-    orange_pct = len(orange_df) / len(df) * 100 if len(df) else 0
-    st.metric("% Orange Rows", f"{orange_pct:.1f}%")
-
-
-# =========================
-# PREVIEW
-# =========================
-
-st.subheader("📄 Data Preview")
-st.dataframe(df, use_container_width=True)
-
-# =========================
-# FILTER ORANGE
-# =========================
-
-
-st.subheader("🟠 Orange Categories")
-orange_df = df[df["color"] == "orange"]
-category_col = df.columns[0]
-
-orange_categories = sorted(
-    orange_df[category_col]
-    .dropna()
-    .astype(str)
-    .unique()
-)
-
-selected_categories = st.multiselect(
-    "Select categories for scatter plot",
-    orange_categories,
-    default=orange_categories
-)
-
-
-# =========================
-# SCATTER PLOT (PLOTLY)
-# =========================
-
-st.subheader("Scatter Plot")
-
-
-numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
-
-if len(numeric_cols) < 2:
-    st.warning("Not enough numeric columns")
-    st.stop()
-
-
-col1, col2 = st.columns(2)
-
-with col1:
-    x_axis = st.selectbox("X axis", numeric_cols)
-
-with col2:
-    y_axis = st.selectbox("Y axis", numeric_cols)
-
-
-color_map = {
-    "orange": "orange",
-    "light_gray": "lightgray",
-    "gray": "gray",
-    "none": "blue"
-}
-
-plot_df = orange_df[
-    orange_df[category_col]
-    .astype(str)
-    .isin(selected_categories)
-]
-
-fig = px.scatter(
-    plot_df,
-    x=x_axis,
-    y=y_axis,
-    color="color",
-    text=category_col,
-    color_discrete_map=color_map
-)
-
-fig.update_traces(textposition="top center")
-
-st.plotly_chart(fig, use_container_width=True)
-
+            st.plotly_chart(fig, use_container_width=True)
