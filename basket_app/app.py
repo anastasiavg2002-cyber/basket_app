@@ -69,12 +69,12 @@ if st.button("RUN PIPELINE"):
 
     def generate_sheet_config(zip_path):
 
-    with tempfile.TemporaryDirectory() as tmp:
-
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(tmp)
-
-        names = set()
+        with tempfile.TemporaryDirectory() as tmp:
+    
+            with zipfile.ZipFile(zip_path, "r") as z:
+                z.extractall(tmp)
+    
+            names = set()
 
         for root, dirs, files in os.walk(tmp):
 
