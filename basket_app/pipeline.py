@@ -3,35 +3,29 @@
 import pandas as pd
 import zipfile
 import shutil
-
+import os
 from pathlib import Path
 
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
 
-# =========================================================
+# =========================
 # PROCESS SHEET
-# =========================================================
+# =========================
 
 def process_sheet(df, valid_values):
 
-    df = df.iloc[:, [1, 2, 7, 8, 15, 16, 17]].copy()
-
+    df = df.iloc[:, [1,2,7,8,15,16,17]].copy()
     df.columns = list("ABCDEFG")
 
-    mask = (
-        (df["A"] == "        ALL VALUES")
-        & (df["B"] != 0)
-    )
-
+    mask = (df["A"] == "        ALL VALUES") & (df["B"] != 0)
     df.loc[mask, "A"] = df.loc[mask, "B"]
 
     df = df.drop(columns=["B"])
-
     df.columns = list("ABCDEF")
 
-    df = df[["A", "D", "E", "F", "B", "C"]]
+    df = df[["A","D","E","F","B","C"]]
 
     df.insert(3, "Trips (000)", "")
 
@@ -39,9 +33,7 @@ def process_sheet(df, valid_values):
         lambda x: 0 if x in valid_values else 1
     )
 
-    df = df[
-        df["A"].astype(str).str.lower() != "    rest"
-    ]
+    df = df[df["A"].astype(str).str.lower() != "    rest"]
 
     new_columns = [
         "",
@@ -56,655 +48,245 @@ def process_sheet(df, valid_values):
 
     df.columns = new_columns
 
+    # ❗ ВАЖНО: убираем строки сразу тут (а не в openpyxl)
+    df = df[df["filter"] == 1].copy()
+
     return df
 
 
-# =========================================================
-# NORMALIZE TEXT
-# =========================================================
+# =========================
+# MATCH PROJECT
+# =========================
 
-def normalize_text(value):
+def match_project(name, project_name):
 
-    if pd.isna(value):
-        return ""
+    name = str(name).lower()
+    parts = name.strip().split()
 
-    return (
-        str(value)
-        .strip()
-        .lower()
-        .replace("_", " ")
-        .replace("-", " ")
-    )
+    if len(parts) == 0:
+        return False
+
+    if parts[0] == "total" and len(parts) > 1:
+        return parts[1] == project_name
+
+    return parts[0] == project_name
 
 
-# =========================================================
+# =========================
 # FORMAT EXCEL
-# =========================================================
+# =========================
 
 def apply_formatting(output_file):
 
     wb = load_workbook(output_file)
 
-    fill_gray = PatternFill(
-        start_color="777777",
-        end_color="777777",
-        fill_type="solid"
-    )
+    gray = PatternFill("solid", fgColor="777777")
+    light_gray = PatternFill("solid", fgColor="CCCCCC")
+    orange = PatternFill("solid", fgColor="FFA500")
 
-    fill_light_gray = PatternFill(
-        start_color="CCCCCC",
-        end_color="CCCCCC",
-        fill_type="solid"
-    )
+    for ws in wb.worksheets:
 
-    orange_fill = PatternFill(
-        start_color="FFA500",
-        end_color="FFA500",
-        fill_type="solid"
-    )
-
-    for sheet_name in wb.sheetnames:
-
-        ws = wb[sheet_name]
-
-        # =================================================
-        # HEADER
-        # =================================================
-
+        # header
         ws.insert_rows(1)
-
         ws.merge_cells("B1:E1")
 
         cell = ws["B1"]
+        cell.value = ws.title
+        cell.font = Font(bold=True, size=11)
+        cell.alignment = Alignment(horizontal="center")
 
-        cell.value = sheet_name
+        # найти индексы колонок по имени
+        headers = {ws.cell(2, col).value: col for col in range(1, ws.max_column + 1)}
 
-        cell.font = Font(
-            bold=True,
-            size=11
-        )
+        aff_col = headers.get("Affinity index to FMCG")
+        trips_col = headers.get("target_trips_raw_CS")
 
-        cell.alignment = Alignment(
-            horizontal="center",
-            vertical="center"
-        )
+        if not aff_col or not trips_col:
+            continue
 
-        # =================================================
-        # FIND COLUMNS BY NAMES
-        # =================================================
+        # =========================
+        # ROW LOOP
+        # =========================
 
-        headers = {}
+        for row in range(3, ws.max_row + 1):
 
-        for col in range(1, ws.max_column + 1):
+            try:
+                aff = ws.cell(row=row, column=aff_col).value
+                trips = ws.cell(row=row, column=trips_col).value
 
-            value = ws.cell(
-                row=2,
-                column=col
-            ).value
+                # convert safely
+                aff = float(aff) if aff is not None else None
+                trips = float(trips) if trips is not None else None
 
-            if value is not None:
-
-                headers[str(value)] = col
-
-        affinity_col = headers.get(
-            "Affinity index to FMCG"
-        )
-
-        target_trips_col = headers.get(
-            "target_trips_raw_CS"
-        )
-
-        filter_col = headers.get(
-            "filter"
-        )
-
-        # =================================================
-        # COLORING
-        # =================================================
-
-        if (
-            affinity_col
-            and target_trips_col
-            and filter_col
-        ):
-
-            for row in range(3, ws.max_row + 1):
-
-                filter_value = ws.cell(
-                    row=row,
-                    column=filter_col
-                ).value
-
-                if filter_value != 1:
-                    continue
-
-                affinity_value = ws.cell(
-                    row=row,
-                    column=affinity_col
-                ).value
-
-                trips_value = ws.cell(
-                    row=row,
-                    column=target_trips_col
-                ).value
-
-                try:
-
-                    affinity = float(
-                        affinity_value
-                    )
-
-                    trips = float(
-                        trips_value
-                    )
-
-                except:
-
-                    continue
-
-                # =================================================
+                # -----------------
                 # ORANGE
-                # Affinity >= 1.5
-                # Trips > 30
-                # =================================================
+                # -----------------
+                if aff is not None and trips is not None:
+                    if aff >= 1.5 and trips > 30:
 
-                if (
-                    affinity >= 1.5
-                    and trips > 30
-                ):
+                        for col in range(2, 6):
+                            ws.cell(row=row, column=col).fill = orange
 
-                    for col in range(
-                        2,
-                        6
-                    ):
+                        continue
 
-                        ws.cell(
-                            row=row,
-                            column=col
-                        ).fill = orange_fill
-
-                # =================================================
-                # DARK GRAY
-                # Trips < 15
-                # =================================================
-
-                elif trips < 15:
-
-                    for col in range(
-                        2,
-                        6
-                    ):
-
-                        ws.cell(
-                            row=row,
-                            column=col
-                        ).fill = fill_gray
-
-                    ws.cell(
-                        row=row,
-                        column=affinity_col
-                    ).value = None
-
-                # =================================================
+                # -----------------
                 # LIGHT GRAY
-                # Affinity >= 1.5
-                # =================================================
+                # -----------------
+                if trips is not None and trips < 15:
 
-                elif affinity >= 1.5:
+                    for col in range(2, 6):
+                        ws.cell(row=row, column=col).fill = light_gray
 
-                    for col in range(
-                        2,
-                        6
-                    ):
+                    # delete affinity value
+                    ws.cell(row=row, column=aff_col).value = None
 
-                        ws.cell(
-                            row=row,
-                            column=col
-                        ).fill = fill_light_gray
+                    continue
 
-        # =================================================
-        # DELETE ROWS WHERE FILTER = 0
-        # =================================================
+                # -----------------
+                # GRAY
+                # -----------------
+                if aff is not None and aff >= 1.5:
 
-        if filter_col:
+                    for col in range(2, 6):
+                        ws.cell(row=row, column=col).fill = gray
 
-            for row in range(
-                ws.max_row,
-                2,
-                -1
-            ):
-
-                value = ws.cell(
-                    row=row,
-                    column=filter_col
-                ).value
-
-                if value == 0:
-
-                    ws.delete_rows(row)
-
-        # =================================================
-        # DELETE EXTRA COLUMNS
-        # =================================================
-
-        if ws.max_column > 5:
-
-            ws.delete_cols(
-                6,
-                ws.max_column - 5
-            )
-
-        # =================================================
-        # FORMAT AFFINITY AS PERCENTAGE
-        # =================================================
-
-        for row in range(
-            3,
-            ws.max_row + 1
-        ):
-
-            ws.cell(
-                row=row,
-                column=3
-            ).number_format = "0.00%"
+            except:
+                continue
 
     wb.save(output_file)
 
 
-# =========================================================
+# =========================
 # MAIN PIPELINE
-# =========================================================
+# =========================
 
 def run_pipeline(
     projects_zip_path,
     reference_path,
     config_path,
     total_path,
-    total_mapping_path,
-    project_mapping_path
+    total_mapping_path
 ):
 
-    # =========================================================
-    # CLEAN
-    # =========================================================
+    shutil.rmtree("projects", ignore_errors=True)
+    shutil.rmtree("results", ignore_errors=True)
 
-    shutil.rmtree(
-        "projects",
-        ignore_errors=True
-    )
+    Path("projects").mkdir(exist_ok=True)
+    Path("results").mkdir(exist_ok=True)
 
-    shutil.rmtree(
-        "results",
-        ignore_errors=True
-    )
+    # unzip
+    with zipfile.ZipFile(projects_zip_path, 'r') as z:
+        z.extractall("projects")
 
-    Path("projects").mkdir(
-        exist_ok=True
-    )
+    # config
+    config = pd.read_excel(config_path)
+    rename_map = dict(zip(config["original"], config["rename"]))
+    order_map = dict(zip(config["rename"], config["order"]))
 
-    Path("results").mkdir(
-        exist_ok=True
-    )
+    # reference
+    ref_df = pd.read_excel(reference_path, sheet_name="Список")
+    valid_values = set(ref_df.iloc[:,0].dropna().astype(str))
 
-    # =========================================================
-    # EXTRACT PROJECTS
-    # =========================================================
+    # total
+    total_df = pd.read_excel(total_path)
 
-    with zipfile.ZipFile(
-        projects_zip_path,
-        "r"
-    ) as zip_ref:
+    mapping_df = pd.read_excel(total_mapping_path)
 
-        zip_ref.extractall(
-            "projects"
-        )
-
-    # =========================================================
-    # SHEET CONFIG
-    # =========================================================
-
-    config = pd.read_excel(
-        config_path
-    )
-
-    rename_map = dict(
+    mapping = dict(
         zip(
-            config["original"],
-            config["rename"]
+            mapping_df["original"],
+            mapping_df["rename"]
         )
     )
 
-    order_map = dict(
-        zip(
-            config["rename"],
-            config["order"]
-        )
-    )
-
-    # =========================================================
-    # REFERENCE FILE
-    # =========================================================
-
-    ref_df = pd.read_excel(
-        reference_path,
-        sheet_name="Список"
-    )
-
-    valid_values = set(
-        ref_df.iloc[:, 0]
-        .dropna()
+    total_df.iloc[:,1] = (
+        total_df.iloc[:,1]
         .astype(str)
+        .map(lambda x: mapping.get(x, x))
     )
 
-    # =========================================================
-    # TOTAL FILE
-    # =========================================================
+    base_path = Path("projects")
+    result_path = Path("results")
 
-    total_df = pd.read_excel(
-        total_path
-    )
-
-    # =========================================================
-    # TOTAL MAPPING
-    # =========================================================
-
-    total_mapping = pd.read_excel(
-        total_mapping_path
-    )
-
-    total_mapping = total_mapping.dropna(
-        subset=["original", "rename"]
-    )
-
-    total_mapping_dict = dict(
-        zip(
-            total_mapping["original"].astype(str),
-            total_mapping["rename"].astype(str)
-        )
-    )
-
-    # =========================================================
-    # APPLY TOTAL MAPPING
-    # =========================================================
-
-    total_df.iloc[:, 1] = (
-        total_df.iloc[:, 1]
-        .astype(str)
-        .map(
-            lambda x: total_mapping_dict.get(
-                x,
-                x
-            )
-        )
-    )
-
-    # =========================================================
-    # PROJECT MAPPING
-    # =========================================================
-
-    project_mapping = pd.read_excel(
-        project_mapping_path
-    )
-
-    project_mapping = project_mapping.dropna(
-        subset=[
-            "project_folder",
-            "total_project"
-        ]
-    )
-
-    project_mapping_dict = dict(
-        zip(
-            project_mapping["project_folder"]
-            .astype(str)
-            .map(normalize_text),
-
-            project_mapping["total_project"]
-            .astype(str)
-            .map(normalize_text)
-        )
-    )
-
-    # =========================================================
-    # PROJECT FOLDERS
-    # =========================================================
-
-    base_path = Path(
-        "projects"
-    )
-
-    result_path = Path(
-        "results"
-    )
-
+    # собрать реальные project folders (устойчиво к вложенности zip)
     project_folders = []
 
     for path in base_path.rglob("*"):
-
-        if not path.is_dir():
-
-            continue
-
-        excel_files = list(
-            path.glob("*.xlsx")
-        )
-
-        if excel_files:
-
-            project_folders.append(
-                path
-            )
-
-    # =========================================================
-    # PROCESS PROJECTS
-    # =========================================================
+        if path.is_dir() and list(path.glob("*.xlsx")):
+            project_folders.append(path)
 
     for project_folder in project_folders:
 
         sheets = []
-
-        folder_name = project_folder.name
-
-        folder_name_normalized = normalize_text(
-            folder_name
-        )
-
-        # Manual project mapping
-        total_project_name = project_mapping_dict.get(
-            folder_name_normalized,
-            folder_name_normalized
-        )
+        project_name = project_folder.name.lower()
 
         for file in project_folder.glob("*.xlsx"):
 
-            df = pd.read_excel(
-                file
-            )
+            df = pd.read_excel(file)
 
             original = file.stem.split("_")[-1]
+            sheet_name = rename_map.get(original, original)
+            order = order_map.get(sheet_name, 999)
 
-            sheet_name = rename_map.get(
-                original,
-                original
-            )
+            processed_df = process_sheet(df, valid_values)
 
-            order = order_map.get(
-                sheet_name,
-                999
-            )
-
-            processed_df = process_sheet(
-                df,
-                valid_values
-            )
-
-            # =================================================
-            # FIND TOTAL ROW
-            # =================================================
-
-            total_project_col = (
-                total_df.iloc[:, 0]
-                .astype(str)
-                .map(normalize_text)
-            )
-
-            total_category_col = (
-                total_df.iloc[:, 1]
-                .astype(str)
-                .map(normalize_text)
-            )
-
+            # --- TOTAL MATCH ---
             row = total_df[
-                (
-                    total_project_col
-                    == total_project_name
+                total_df.iloc[:,0].apply(
+                    lambda x: match_project(x, project_name)
                 )
                 &
                 (
-                    total_category_col
-                    == normalize_text(
-                        sheet_name
-                    )
+                    total_df.iloc[:,1]
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                    == sheet_name.lower()
                 )
             ]
 
-            # =================================================
-            # GET TRIPS
-            # =================================================
-
             if not row.empty:
-
-                trips_raw = row.iloc[0, 2]
-
-                trips_rp = row.iloc[0, 3]
-
+                trips_rp = row.iloc[0,3]
             else:
-
-                trips_raw = None
-
                 trips_rp = None
 
-            processed_df[
-                "trips_raw"
-            ] = trips_raw
+            # --- Trips (000) ---
+            if trips_rp is not None and "Trips Share" in processed_df.columns:
 
-            processed_df[
-                "trips_rp"
-            ] = trips_rp
+                trips_list = [trips_rp]
 
-            # =================================================
-            # CALCULATE TRIPS (000)
-            # =================================================
-
-            if (
-                trips_rp is not None
-                and "Trips Share" in processed_df.columns
-            ):
-
-                trips_list = []
-
-                for index, value in enumerate(
-                    processed_df["Trips Share"]
-                ):
+                for val in processed_df["Trips Share"].iloc[1:]:
 
                     try:
-
-                        value = float(
-                            value
-                        )
-
+                        trips_list.append(trips_rp * float(val))
                     except:
+                        trips_list.append(None)
 
-                        value = 0
+                processed_df["Trips (000)"] = trips_list
 
-                    if index == 0:
+            sheets.append((sheet_name, order, processed_df))
 
-                        trips_list.append(
-                            trips_rp
-                        )
-
-                    else:
-
-                        trips_list.append(
-                            trips_rp * value
-                        )
-
-                processed_df[
-                    "Trips (000)"
-                ] = trips_list
-
-            sheets.append(
-                (
-                    sheet_name,
-                    order,
-                    processed_df
-                )
-            )
-
-        # =================================================
-        # SORT SHEETS
-        # =================================================
-
-        sheets = sorted(
-            sheets,
-            key=lambda x: x[1]
-        )
-
-        # =================================================
-        # SAFETY CHECK
-        # =================================================
-
+        # если пусто — пропуск (ВАЖНО чтобы не падал ExcelWriter)
         if not sheets:
-
             continue
 
-        # =================================================
-        # WRITE EXCEL
-        # =================================================
+        sheets = sorted(sheets, key=lambda x: x[1])
 
-        output_file = (
-            result_path
-            / f"Basket Analysis_{folder_name}.xlsx"
-        )
+        output_file = result_path / f"Basket Analysis_{project_folder.name}.xlsx"
 
-        with pd.ExcelWriter(
-            output_file,
-            engine="openpyxl"
-        ) as writer:
+        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
 
             for sheet_name, _, df in sheets:
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-                df.to_excel(
-                    writer,
-                    sheet_name=sheet_name,
-                    index=False
-                )
+        apply_formatting(output_file)
 
-        # =================================================
-        # FORMAT
-        # =================================================
-
-        apply_formatting(
-            output_file
-        )
-
-    # =========================================================
-    # ZIP RESULTS
-    # =========================================================
-
+    # zip results
     output_zip = "results.zip"
 
-    with zipfile.ZipFile(
-        output_zip,
-        "w",
-        zipfile.ZIP_DEFLATED
-    ) as zipf:
+    with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as z:
 
         for file in result_path.glob("*.xlsx"):
-
-            zipf.write(
-                file,
-                arcname=file.name
-            )
+            z.write(file, arcname=file.name)
 
     return output_zip
