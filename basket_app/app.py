@@ -522,7 +522,37 @@ if total_file:
         )
     )
 
+# ============================================================
+# APPLY TOTAL CATEGORY MAPPING IN MEMORY
+# ============================================================
 
+total_df_preview = pd.read_excel(
+    total_file
+)
+
+total_mapping = dict(
+    zip(
+        st.session_state.total_category_mapping["original"],
+        st.session_state.total_category_mapping["rename"]
+    )
+)
+
+total_df_preview.iloc[:, 1] = (
+    total_df_preview.iloc[:, 1]
+    .astype(str)
+    .map(
+        lambda x: total_mapping.get(x, x)
+    )
+)
+
+st.subheader(
+    "📄 Total Preview"
+)
+
+st.dataframe(
+    total_df_preview,
+    use_container_width=True
+)
 # ============================================================
 # RUN PIPELINE
 # ============================================================
