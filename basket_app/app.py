@@ -75,17 +75,23 @@ if "total_signature" not in st.session_state:
 # =========================
 # FILE UPLOADS
 # =========================
-
+st.info(
+        "Папка projects.zip - архив с исходными папками проектов, где каждая папка имеет название категории, а внутри хранятся листы по каналам"
+    )
 projects_zip = st.file_uploader(
     "Upload projects.zip",
     type=["zip"]
 )
-
+st.info(
+        "Файл Список.xlsx содержит список необходимых food категорий"
+    )
 reference_file = st.file_uploader(
     "Upload Список.xlsx",
     type=["xlsx"]
 )
-
+st.info(
+        "Файл total.xlsx содержит ось каналов по категориям с Trips raw и Trips(000)  "
+    )
 total_file = st.file_uploader(
     "Upload total.xlsx",
     type=["xlsx"]
@@ -302,7 +308,7 @@ if projects_zip and total_file:
 # RUN PIPELINE
 # ============================================================
 
-if st.button("🚀 RUN PIPELINE"):
+if st.button("RUN"):
 
     if not projects_zip:
 
