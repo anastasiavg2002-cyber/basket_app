@@ -356,20 +356,15 @@ def normalize_name(value):
 # ============================================================
 # MAIN PIPELINE
 # ============================================================
-
 def run_pipeline(
-
     projects_zip_path,
-
     reference_path,
-
     config_path,
-
     total_path,
-
-    project_mapping_path
-
+    project_mapping_path,
+    total_mapping_path
 ):
+
 
 
     # -------------------------
