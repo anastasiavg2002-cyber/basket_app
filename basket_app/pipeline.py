@@ -154,17 +154,6 @@ def apply_formatting(output_file):
             except:
                  continue
 
-        # =========================
-        # DELETE LAST 3 COLUMNS
-        # =========================
-
-        if ws.max_column >= 3:
-
-            ws.delete_cols(
-                ws.max_column - 2,
-                3
-            )
-
     wb.save(output_file)
 
 # =========================
