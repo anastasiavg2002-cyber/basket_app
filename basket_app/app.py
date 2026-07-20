@@ -30,13 +30,15 @@ st.title("📊 Basket Analysis")
 
 st.sidebar.header("Coloring Rules")
 
-aff_threshold = st.sidebar.slider(
-    "Affinity threshold",
-    0.0,
-    5.0,
-    1.5,
-    0.1
+aff_threshold_percent = st.sidebar.slider(
+    "Affinity threshold (%)",
+    0,
+    500,
+    150,
+    10
 )
+
+aff_threshold = aff_threshold_percent / 100
 
 high_trips = st.sidebar.slider(
     "High Trips threshold",
