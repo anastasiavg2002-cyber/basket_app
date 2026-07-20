@@ -58,16 +58,14 @@ low_trips = st.sidebar.slider(
 )
 
 # =========================
-
 # SESSION STATE INIT
-
 # =========================
 
 if "sheet_config" not in st.session_state:
-st.session_state.sheet_config = None
+    st.session_state.sheet_config = None
 
 if "mapping" not in st.session_state:
-st.session_state.mapping = None
+    st.session_state.mapping = None
 
 # =========================
 
