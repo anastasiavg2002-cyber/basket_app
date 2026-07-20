@@ -151,8 +151,8 @@ def apply_formatting(output_file):
                         ws.cell(row=row, column=col).fill = gray
 
 
-                except:
-                    continue
+            except:
+                 continue
 
         # =========================
         # DELETE LAST 3 COLUMNS
