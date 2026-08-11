@@ -199,20 +199,20 @@ def run_pipeline(
             mapping_df["rename"]
         )
     )
+        # =========================
+    # PROJECT ↔ TOTAL MAPPING
     # =========================
-# PROJECT ↔ TOTAL MAPPING
-# =========================
-
-project_mapping_df = pd.read_excel(
-    project_mapping_path
-)
-
-project_mapping = dict(
-    zip(
-        project_mapping_df["project_folder"],
-        project_mapping_df["total_project"]
+    
+    project_mapping_df = pd.read_excel(
+        project_mapping_path
     )
-)
+    
+    project_mapping = dict(
+        zip(
+            project_mapping_df["project_folder"],
+            project_mapping_df["total_project"]
+        )
+    )
 
     total_df.iloc[:,1] = (
         total_df.iloc[:,1]
@@ -240,7 +240,7 @@ project_mapping = dict(
             project_folder_name
         )
 
-project_name = str(project_name).strip().lower()
+    project_name = str(project_name).strip().lower()
         for file in project_folder.glob("*.xlsx"):
 
             df = pd.read_excel(file)
