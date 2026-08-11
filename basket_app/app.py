@@ -200,9 +200,6 @@ if total_file:
         total_file
     )
 
-    st.session_state.mapping = generate_mapping1(
-        total_file
-    )
 
     st.session_state.mapping = st.data_editor(
         st.session_state.mapping,
