@@ -210,6 +210,7 @@ if total_file:
     )
     st.info(
     "Проверьте, что названия в правых столбцах в файле Total и  совпадают"
+    )
     st.session_state.mapping = generate_mapping1(
         total_file
     )
