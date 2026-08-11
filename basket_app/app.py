@@ -153,20 +153,44 @@ def generate_mapping(total_file):
 
     return mapping_df
 
-def generate_mapping1(total_file):
+def generate_mapping1(projects_zip, total_file):
 
+    # Получаем названия папок проектов
+    projects = get_projects_from_zip(projects_zip)
+
+    # Читаем Total
     total_df = pd.read_excel(total_file)
 
+    # Уникальные значения первого столбца Total
+    total_projects = sorted(
+        total_df.iloc[:, 0]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .unique()
+    )
+
+    # Создаем таблицу сопоставления
     mapping_df = pd.DataFrame({
-        "original": sorted(
-            total_df.iloc[:, 0]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
+        "project_folder": projects,
+        "total_project": ""
     })
 
-    mapping_df["rename"] = mapping_df["original"]
+    # Автоматическое сопоставление,
+    # если названия полностью совпадают
+    for i in range(len(mapping_df)):
+
+        project_name = str(
+            mapping_df.loc[i, "project_folder"]
+        ).strip().lower()
+
+        matches = [
+            x for x in total_projects
+            if str(x).strip().lower() == project_name
+        ]
+
+        if len(matches) == 1:
+            mapping_df.loc[i, "total_project"] = matches[0]
 
     return mapping_df
 
@@ -208,15 +232,50 @@ if total_file:
     st.info(
     "Проверьте, что названия в правых столбцах в файле Total и  совпадают"
     )
-    st.session_state.mapping = generate_mapping1(
-        total_file
-    )
-    
-    st.session_state.mapping = st.data_editor(
-        st.session_state.mapping,
-        use_container_width=True
-    )
+     # =========================
+    # PROJECT ↔ TOTAL MAPPING
+    # =========================
 
+    if projects_zip:
+
+        st.info(
+            "Сопоставьте названия папок projects с названиями проектов в первом столбце Total"
+        )
+
+        project_mapping = generate_mapping1(
+            projects_zip,
+            total_file
+        )
+
+        total_projects = sorted(
+            pd.read_excel(total_file)
+            .iloc[:, 0]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .unique()
+            .tolist()
+        )
+
+        project_mapping = st.data_editor(
+            project_mapping,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "project_folder": st.column_config.TextColumn(
+                    "Project folder",
+                    disabled=True
+                ),
+
+                "total_project": st.column_config.SelectboxColumn(
+                    "Total project",
+                    options=[""] + total_projects,
+                    required=False
+                )
+            }
+        )
+
+        st.session_state.project_mapping = project_mapping
 
 
 
@@ -284,6 +343,11 @@ if st.button("RUN"):
         "total_mapping.xlsx",
         index=False
     )
+    
+    st.session_state.project_mapping.to_excel(
+    "project_mapping.xlsx",
+    index=False
+)
 
 
     with st.spinner("Processing..."):
@@ -293,7 +357,8 @@ if st.button("RUN"):
             "Список.xlsx",
             "sheet_config.xlsx",
             "total.xlsx",
-            "total_mapping.xlsx"
+            "total_mapping.xlsx",
+            "project_mapping.xlsx"
         )
 
 
