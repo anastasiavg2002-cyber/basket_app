@@ -480,14 +480,26 @@ def run_pipeline(
             # =========================
             # TOTAL MATCH
             # =========================
-
+            
+            total_project_name = str(
+                project_mapping.get(
+                    project_folder_name,
+                    ""
+                )
+            ).strip().lower()
+            
+            total_channel_name = str(
+                sheet_name
+            ).strip().lower()
+            
             row = total_df[
-                total_df.iloc[:, 0].apply(
-                    lambda x:
-                    match_project(
-                        x,
-                        project_name
-                    )
+                (
+                    total_df.iloc[:, 0]
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                    ==
+                    total_project_name
                 )
                 &
                 (
@@ -496,7 +508,7 @@ def run_pipeline(
                     .str.strip()
                     .str.lower()
                     ==
-                    sheet_name.lower()
+                    total_channel_name
                 )
             ]
 
