@@ -82,7 +82,7 @@ projects_zip = st.file_uploader(
 )
 
 st.info(
-    "Файл Список.xlsx содержит список необходимых food категорий"
+    "Файл Список.xlsx содержит список  nonfood категорий для удаления"
 )
 
 reference_file = st.file_uploader(
