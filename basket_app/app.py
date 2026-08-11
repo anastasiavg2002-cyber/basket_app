@@ -257,9 +257,7 @@ if total_file:
         st.session_state.mapping,
         use_container_width=True
     )
-    st.info(
-    "Проверьте, что названия в правых столбцах в файле Total и  совпадают"
-    )
+   
      # =========================
     # PROJECT ↔ TOTAL MAPPING
     # =========================
