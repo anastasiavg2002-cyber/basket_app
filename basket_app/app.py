@@ -208,6 +208,20 @@ if total_file:
         st.session_state.mapping,
         use_container_width=True
     )
+     st.info(
+    "Проверьте, что названия в правых столбцах в файле Total и  совпадают"
+    st.session_state.mapping = generate_mapping1(
+        total_file
+    )
+    
+     st.session_state.mapping = st.data_editor(
+        st.session_state.mapping,
+        use_container_width=True
+    )
+
+
+
+
 
 
 # =========================
