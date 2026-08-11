@@ -165,7 +165,8 @@ def run_pipeline(
     reference_path,
     config_path,
     total_path,
-    total_mapping_path
+    total_mapping_path,
+    project_mapping_path
 ):
 
     shutil.rmtree("projects", ignore_errors=True)
@@ -198,6 +199,20 @@ def run_pipeline(
             mapping_df["rename"]
         )
     )
+    # =========================
+# PROJECT ↔ TOTAL MAPPING
+# =========================
+
+project_mapping_df = pd.read_excel(
+    project_mapping_path
+)
+
+project_mapping = dict(
+    zip(
+        project_mapping_df["project_folder"],
+        project_mapping_df["total_project"]
+    )
+)
 
     total_df.iloc[:,1] = (
         total_df.iloc[:,1]
@@ -218,8 +233,14 @@ def run_pipeline(
     for project_folder in project_folders:
 
         sheets = []
-        project_name = project_folder.name.lower()
+        project_folder_name = project_folder.name
 
+        project_name = project_mapping.get(
+            project_folder_name,
+            project_folder_name
+        )
+
+project_name = str(project_name).strip().lower()
         for file in project_folder.glob("*.xlsx"):
 
             df = pd.read_excel(file)
