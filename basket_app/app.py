@@ -215,7 +215,7 @@ if total_file:
         total_file
     )
     
-     st.session_state.mapping = st.data_editor(
+    st.session_state.mapping = st.data_editor(
         st.session_state.mapping,
         use_container_width=True
     )
