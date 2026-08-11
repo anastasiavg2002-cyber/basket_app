@@ -153,6 +153,23 @@ def generate_mapping(total_file):
 
     return mapping_df
 
+def generate_mapping1(total_file):
+
+    total_df = pd.read_excel(total_file)
+
+    mapping_df = pd.DataFrame({
+        "original": sorted(
+            total_df.iloc[:, 0]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+    })
+
+    mapping_df["rename"] = mapping_df["original"]
+
+    return mapping_df
+
 
 # =========================
 # BUILD CONFIG UI
@@ -175,8 +192,15 @@ if projects_zip:
 if total_file:
 
     st.subheader("Total File")
+    st.info(
+    "Проверьте, что названия в правых столбцах в файле Total и Sheets configuration совпадают"
+)
 
     st.session_state.mapping = generate_mapping(
+        total_file
+    )
+
+    st.session_state.mapping = generate_mapping1(
         total_file
     )
 
