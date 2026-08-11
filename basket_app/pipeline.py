@@ -84,12 +84,12 @@ def apply_formatting(output_file):
 
     gray = PatternFill(
         "solid",
-        fgColor="777777"
+        fgColor="CCCCCC"
     )
 
     light_gray = PatternFill(
         "solid",
-        fgColor="CCCCCC"
+        fgColor="777777"
     )
 
     orange = PatternFill(
