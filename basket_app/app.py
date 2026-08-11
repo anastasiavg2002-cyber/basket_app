@@ -153,6 +153,34 @@ def generate_mapping(total_file):
 
     return mapping_df
 
+def get_projects_from_zip(uploaded_zip):
+
+    projects = set()
+
+    with tempfile.TemporaryDirectory() as tmp:
+
+        zip_bytes = uploaded_zip.getvalue()
+
+        zip_path = os.path.join(tmp, "projects.zip")
+
+        with open(zip_path, "wb") as f:
+            f.write(zip_bytes)
+
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(tmp)
+
+        for root, dirs, files in os.walk(tmp):
+
+            if any(file.endswith(".xlsx") for file in files):
+
+                folder_name = os.path.basename(root)
+
+                if folder_name != os.path.basename(tmp):
+
+                    projects.add(folder_name)
+
+    return sorted(projects)
+
 def generate_mapping1(projects_zip, total_file):
 
     # Получаем названия папок проектов
@@ -243,9 +271,9 @@ if total_file:
         )
 
         project_mapping = generate_mapping1(
-            projects_zip,
-            total_file
-        )
+    projects_zip,
+    total_file
+)
 
         total_projects = sorted(
             pd.read_excel(total_file)
